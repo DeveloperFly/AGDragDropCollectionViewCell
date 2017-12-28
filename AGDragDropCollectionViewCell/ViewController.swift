@@ -20,6 +20,9 @@ class ViewController: UIViewController {
     //MARK: - View Life Cycle
     override func viewDidLoad() {
         super.viewDidLoad()
+        topCollectionView?.dragDelegate = self
+        topCollectionView.dragInteractionEnabled = true
+        bottomCollectionView.dropDelegate = self
     }
 
     override func didReceiveMemoryWarning() {
@@ -68,3 +71,67 @@ extension ViewController: UICollectionViewDelegateFlowLayout {
     
 }
 
+//MARK: - UICollectionViewDragDelegate
+extension ViewController: UICollectionViewDragDelegate {
+    func collectionView(_ collectionView: UICollectionView, itemsForBeginning session: UIDragSession, at indexPath: IndexPath) -> [UIDragItem] {
+        let dragItem = self.dragItem(forPhotoAt: indexPath)
+        return [dragItem]
+    }
+    
+    func collectionView(_ collectionView: UICollectionView, itemsForAddingTo session: UIDragSession, at indexPath: IndexPath, point: CGPoint) -> [UIDragItem] {
+        let dragItem = self.dragItem(forPhotoAt: indexPath)
+        return [dragItem]
+    }
+
+    /// Helper method
+    private func dragItem(forPhotoAt indexPath: IndexPath) -> UIDragItem {
+        let imageName = self.arrayFirst[indexPath.row]
+        let itemProvider = NSItemProvider(object: imageName as NSItemProviderWriting)
+        let dragItem = UIDragItem(itemProvider: itemProvider)
+        dragItem.localObject = imageName
+        return dragItem
+    }
+    
+}
+
+extension ViewController: UICollectionViewDropDelegate {
+    func collectionView(_ collectionView: UICollectionView, performDropWith coordinator: UICollectionViewDropCoordinator) {
+
+        let destinationIndexPath = coordinator.destinationIndexPath ?? IndexPath(item: 0, section: 0)
+        loadAndInsertItems(at: destinationIndexPath, with: coordinator)
+    }
+    
+    func collectionView(_ collectionView: UICollectionView, canHandle session: UIDropSession) -> Bool {
+        return session.canLoadObjects(ofClass: NSString.self)
+    }
+    
+    func collectionView(_ collectionView: UICollectionView, dropSessionDidUpdate session: UIDropSession, withDestinationIndexPath destinationIndexPath: IndexPath?) -> UICollectionViewDropProposal {
+        return UICollectionViewDropProposal(operation: .copy, intent: .insertAtDestinationIndexPath)
+    }
+    
+    private func loadAndInsertItems(at destinationIndexPath: IndexPath, with coordinator: UICollectionViewDropCoordinator) {
+        let destinationIndexPath: IndexPath
+        
+        if let indexPath = coordinator.destinationIndexPath {
+            destinationIndexPath = indexPath
+        } else {
+            let section = bottomCollectionView.numberOfSections - 1
+            let row = bottomCollectionView.numberOfItems(inSection: section)
+            destinationIndexPath = IndexPath(row: row, section: section)
+        }
+        
+        coordinator.session.loadObjects(ofClass: NSString.self) { items in
+            guard let string = items as? [String] else { return }
+            
+            var indexPaths = [IndexPath]()
+            
+            for (index, value) in string.enumerated() {
+                let indexPath = IndexPath(row: destinationIndexPath.row + index, section: destinationIndexPath.section)
+                self.arraySecond.insert(value, at: indexPath.row)
+                indexPaths.append(indexPath)
+            }
+            self.bottomCollectionView.insertItems(at: indexPaths)
+        }
+    }
+    
+}
